@@ -33,7 +33,7 @@
       "pat.teaser": "Teaser", "pat.conceptual": "Conceptual", "pat.framework": "Framework",
       "pat.pipeline": "Pipeline", "pat.architecture": "Architecture",
       "pat.taxonomy": "Taxonomy / Benchmark", "pat.results": "Results", "pat.comparison": "Comparison",
-      "tier.best": "Best Paper", "tier.oral": "Oral", "tier.spotlight": "Spotlight",
+      "tier.best": "Best / Outstanding", "tier.oral": "Oral", "tier.spotlight": "Spotlight",
       "rib.best": "★ Best Paper", "rib.honor": "Honorable Mention",
       "rib.oral": "● Oral", "rib.spot": "● Spotlight",
       "card.viewImage": "View image", "card.paper": "paper ↗",
@@ -47,7 +47,7 @@
       "pat.teaser": "主视觉", "pat.conceptual": "概念图", "pat.framework": "框架总览",
       "pat.pipeline": "流程图", "pat.architecture": "架构图",
       "pat.taxonomy": "全景 / 基准", "pat.results": "结果", "pat.comparison": "对比",
-      "tier.best": "最佳论文", "tier.oral": "口头报告", "tier.spotlight": "焦点论文",
+      "tier.best": "最佳 / 杰出论文", "tier.oral": "口头报告", "tier.spotlight": "焦点论文",
       "rib.best": "★ 最佳论文", "rib.honor": "荣誉提名",
       "rib.oral": "● 口头报告", "rib.spot": "● 焦点论文",
       "card.viewImage": "查看图片", "card.paper": "论文 ↗",
@@ -81,7 +81,7 @@
     if (!additions) {
       additions = new Promise((resolve) => {
         const script = document.createElement("script");
-        script.src = "gallery-local/figures.js";
+        script.src = "gallery-local/figures.js?v=paper-distinctions";
         script.onload = () => resolve(curatedFigures.concat(window.GALLERY_ADDITIONS || []));
         script.onerror = () => {
           additions = undefined;
@@ -148,7 +148,7 @@
     figures.forEach((figure) => {
       byVenue[figure.venue] = (byVenue[figure.venue] || 0) + 1;
       if (figure.award) byTier.best++;
-      else if (figure.tier in byTier) byTier[figure.tier]++;
+      if (figure.tier in byTier) byTier[figure.tier]++;
       patterns.add(figure.pattern);
     });
     venues = Object.keys(VENUES).filter((venue) => byVenue[venue]);
@@ -212,12 +212,12 @@
     if (state.venue !== "all" && f.venue !== state.venue) return false;
     if (state.year !== "all" && String(f.year) !== String(state.year)) return false;
     if (state.pattern !== "all" && f.pattern !== state.pattern) return false;
-    if (state.tier === "best") { if (!f.award) return false; }
-    else if (state.tier === "oral") { if (f.award || f.tier !== "oral") return false; }
-    else if (state.tier === "spotlight") { if (f.award || f.tier !== "spotlight") return false; }
+    if (state.tier === "best" && !f.award) return false;
+    if ((state.tier === "oral" || state.tier === "spotlight") && f.tier !== state.tier) return false;
     if (state.q) {
       const hay = [f.title, (f.authors || []).join(" "), VENUES[f.venue].name,
                    f.year, f.pattern, PATTERNS[f.pattern] || "", patLabel(f.pattern),
+                   f.tier_label || "", f.award_label || "",
                    f.tier ? TIERS[f.tier] : "", f.tier ? tierLabel(f.tier) : "",
                    f.award ? "best paper award outstanding 最佳论文" : ""]
         .join(" ").toLowerCase();
@@ -246,15 +246,15 @@
 
   /* ---------- chunked render ---------- */
   function ribbonInfo(f) {
-    if (f.award === "best") return { className: "rb-best", key: "rib.best" };
-    if (f.award === "honorable") return { className: "rb-honor", key: "rib.honor" };
-    if (f.tier === "oral") return { className: "rb-oral", key: "rib.oral" };
-    if (f.tier === "spotlight") return { className: "rb-spotlight", key: "rib.spot" };
+    if (f.award === "best") return { className: "rb-best", label: f.award_label || GAL_I18N.t("rib.best") };
+    if (f.award === "honorable") return { className: "rb-honor", label: f.award_label || GAL_I18N.t("rib.honor") };
+    if (f.tier === "oral") return { className: "rb-oral", label: f.tier_label || GAL_I18N.t("rib.oral") };
+    if (f.tier === "spotlight") return { className: "rb-spotlight", label: f.tier_label || GAL_I18N.t("rib.spot") };
     return null;
   }
   function ribbonHtml(f) {
     const info = ribbonInfo(f);
-    return info ? `<span class="ribbon ${info.className}">${GAL_I18N.t(info.key)}</span>` : "";
+    return info ? `<span class="ribbon ${info.className}">${escapeHtml(info.label)}</span>` : "";
   }
   function cardHtml(f, idx) {
     const ratio = (f.w && f.h) ? `aspect-ratio:${f.w} / ${f.h};` : "min-height:170px;";
@@ -499,13 +499,13 @@
     const aBadge = $("#lb-award");
     if (f.award) {
       aBadge.hidden = false;
-      aBadge.textContent = GAL_I18N.t(f.award === "best" ? "rib.best" : "rib.honor");
+      aBadge.textContent = f.award_label || GAL_I18N.t(f.award === "best" ? "rib.best" : "rib.honor");
       aBadge.className = "badge tier-badge " + (f.award === "best" ? "rb-best" : "rb-honor");
     } else aBadge.hidden = true;
     const tBadge = $("#lb-tier");
     if (f.tier) {
       tBadge.hidden = false;
-      tBadge.textContent = tierLabel(f.tier);
+      tBadge.textContent = f.tier_label || tierLabel(f.tier);
       tBadge.className = "badge tier-badge " + (f.tier === "oral" ? "rb-oral" : "rb-spotlight");
     } else tBadge.hidden = true;
     const vBadge = $("#lb-venue");
@@ -516,7 +516,7 @@
     pBadge.textContent = patLabel(f.pattern);
     const ribbonTarget = $("#lb-ribbon-target");
     const ribbon = ribbonInfo(f);
-    ribbonTarget.textContent = ribbon ? GAL_I18N.t(ribbon.key) : "";
+    ribbonTarget.textContent = ribbon ? ribbon.label : "";
     ribbonTarget.className = `ribbon ribbon-target${ribbon ? " " + ribbon.className : ""}`;
     $("#lb-title").textContent = f.title;
     $("#lb-authors").textContent = (f.authors || []).join(", ");
