@@ -110,6 +110,8 @@ def store_image(paper, image_bytes, source, origin, caption="", arxiv=None):
     }
     if arxiv:
         row["arxiv"] = f"https://arxiv.org/abs/{arxiv}"
+    if paper.get("decision"):
+        row["decision"] = paper["decision"]
     if paper.get("tier") in {"oral", "spotlight"}:
         row["tier"] = paper["tier"]
     return key, row
@@ -138,9 +140,9 @@ class Catalog:
         }
 
     def existing(self):
+        records = ((key, json.loads(raw)) for key, raw in self.db.execute("SELECT paper_key, record FROM figures"))
         return self.curated | {
-            key for key, record in self.db.execute("SELECT paper_key, record FROM figures")
-            if (ROOT / json.loads(record)["image"]).is_file()
+            key for key, row in records if not row.get("excluded_reason") and (ROOT / row["image"]).is_file()
         }
 
     def save(self, result):
@@ -148,17 +150,29 @@ class Catalog:
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
             current = self.db.execute("SELECT record FROM figures WHERE paper_key=?", (key,)).fetchone()
-            if current:
-                saved = json.loads(current[0])
-                if saved.get("pattern_source") == "visual-review" and saved["image"] == row["image"]:
-                    row = {**row, "pattern": saved["pattern"], "pattern_source": "visual-review"}
+            saved = json.loads(current[0]) if current else {}
+            if saved.get("pattern_source") == "visual-review" and saved["image"] == row["image"]:
+                row = {**row, "pattern": saved["pattern"], "pattern_source": "visual-review"}
             self.db.execute("""
                 INSERT INTO figures VALUES (?, ?, ?)
                 ON CONFLICT(paper_key) DO UPDATE SET
                     source=excluded.source, record=excluded.record
-                WHERE figures.source != 'diagram-bank' OR excluded.source = 'diagram-bank'
-            """, (key, row["source"], json.dumps(row, ensure_ascii=False)))
+                WHERE figures.source != 'diagram-bank' OR excluded.source = 'diagram-bank' OR ?
+            """, (key, row["source"], json.dumps(row, ensure_ascii=False), bool(saved.get("excluded_reason"))))
             self.db.execute("DELETE FROM attempts WHERE paper_key=?", (key,))
+
+    def exclude_unaccepted_diagram_bank(self, keys):
+        if not keys:
+            return
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            records = self.db.execute("SELECT paper_key, record FROM figures WHERE source = 'diagram-bank'").fetchall()
+            for key, raw in records:
+                if key in keys:
+                    row = json.loads(raw)
+                    row["excluded_reason"] = "No final acceptance in the DiagramBank release"
+                    self.db.execute("UPDATE figures SET record=? WHERE paper_key=?",
+                                    (json.dumps(row, ensure_ascii=False), key))
 
     def record_attempt(self, key, status, detail):
         with self.db:
@@ -173,7 +187,7 @@ class Catalog:
                 json.loads(record) for key, record in self.db.execute("SELECT paper_key, record FROM figures")
                 if key not in self.curated
             ]
-            rows = [row for row in rows if (ROOT / row["image"]).is_file()]
+            rows = [row for row in rows if not row.get("excluded_reason") and (ROOT / row["image"]).is_file()]
             rows.sort(key=lambda row: (row["venue"], row["year"], row["id"]))
             bundle = "window.GALLERY_ADDITIONS = " + json.dumps(rows, ensure_ascii=True) + ";\n"
             try:

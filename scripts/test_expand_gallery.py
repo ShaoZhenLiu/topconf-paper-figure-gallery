@@ -78,6 +78,30 @@ class PdfFallbackTest(unittest.TestCase):
 
 
 class DiagramBankTest(unittest.TestCase):
+    def test_release_excludes_rejected_withdrawn_and_unconfirmed_records(self):
+        decisions = [
+            ("Accept (Poster)", "accept_poster", True),
+            ("ICML 2025 spotlightposter", "icml_2025_spotlightposter", True),
+            ("Reject", "accept_poster", False),
+            ("Accept (Oral)", "withdrawn", False),
+            ("Conditional Accept (Poster)", "conditional_accept_poster", False),
+            ("Accept, later withdrawn", "accept_poster", False),
+            ("", "accept_poster", False),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "data.jsonl"
+            metadata = [
+                {"figure_number": "1", "venue": "ICML", "year": 2025, "title": f"Paper {index}",
+                 "decision": label,
+                 "figure_path": f"OpenReview/ICML/figures/2025/{group}/forum{index}/Figure1.png"}
+                for index, (label, group, _) in enumerate(decisions)
+            ]
+            path.write_text("\n".join(map(json.dumps, metadata)), encoding="utf-8")
+            groups, excluded = diagrambank.release_figures(path)
+        titles = {paper["title"] for rows in groups.values() for paper, _ in rows.values()}
+        self.assertEqual(titles, {"Paper 0", "Paper 1"})
+        self.assertEqual(len(excluded), sum(not keep for _, _, keep in decisions))
+
     def test_archive_import_reads_only_selected_member(self):
         data = png()
         archive = io.BytesIO()
@@ -108,6 +132,24 @@ class DiagramBankTest(unittest.TestCase):
 
 
 class CatalogTest(unittest.TestCase):
+    def test_excluded_diagram_entry_can_be_replaced_by_official_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "data").mkdir()
+            (root / "data" / "figures.json").write_text("[]", encoding="utf-8")
+            (root / "figure.jpg").touch()
+            with patch.object(catalog, "ROOT", root), patch.object(catalog, "LOCAL", root / "local"):
+                gallery = catalog.Catalog()
+                with closing(gallery.db):
+                    row = {"id": "p1", "image": "figure.jpg", "year": 2026, "venue": "iclr"}
+                    gallery.save(("paper", {**row, "source": "diagram-bank"}))
+                    gallery.exclude_unaccepted_diagram_bank({"paper"})
+                    self.assertEqual(gallery.existing(), set())
+                    self.assertEqual(gallery.publish(), [])
+                    gallery.save(("paper", {**row, "source": "arxiv-html"}))
+                    self.assertEqual(gallery.existing(), {"paper"})
+                    self.assertEqual(gallery.publish()[0]["source"], "arxiv-html")
+
     def test_export_retries_when_windows_reader_holds_the_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "figures.js"

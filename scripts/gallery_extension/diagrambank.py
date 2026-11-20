@@ -23,6 +23,7 @@ REVISION = "8d8d408b4ccff03d76e8cbd7b2f39a0914405c7e"
 METADATA_SHA256 = "6b8eb310827342405eafc4f383054aa6357b78c2f97613675f09b55870f19708"
 RANGE_SIZE = 16 * 1024 * 1024
 CURL = shutil.which("curl.exe") or shutil.which("curl")
+NONFINAL_DECISION = re.compile(r"\b(?:reject\w*|withdraw\w*|conditional|declin\w*)\b", re.I)
 
 
 def curl_args():
@@ -144,8 +145,22 @@ class ArchiveStream:
             self.partial.unlink(missing_ok=True)
 
 
-def candidates(metadata):
+def accepted_decision(venue, year, label, archive_group):
+    normalized = " ".join(label.casefold().split())
+    if NONFINAL_DECISION.search(f"{normalized} {archive_group.replace('_', ' ')}"):
+        return False
+    if re.match(r"^accept(?:ed)?\b", normalized):
+        return True
+    # The release uses ICML's presentation track as the decision in several years.
+    return venue == "icml" and re.fullmatch(
+        rf"icml {year} (?:poster|oral(?: ?poster)?|spotlight(?: ?poster)?)", normalized,
+    ) is not None
+
+
+def release_figures(metadata):
     groups = defaultdict(dict)
+    excluded = set()
+    accepted = set()
     with metadata.open(encoding="utf-8") as source:
         for line in source:
             record = json.loads(line)
@@ -159,14 +174,25 @@ def candidates(metadata):
             archive_venue, _, archive_year, decision, forum, filename = path.parts[-6:]
             if not (archive_year.isdecimal() and decision.replace("_", "").isalnum()):
                 continue
-            archive = f"{archive_venue}_{archive_year}_{decision}.tar.gz"
+            label = str(record.get("decision") or "").strip()
             page = record.get("url") or "https://openreview.net/forum?id=" + quote(forum)
             pdf = "https://openreview.net/pdf?id=" + quote(forum)
             tier = next((tier for tier in ("oral", "spotlight") if tier in decision.lower()), "")
             paper = {"venue": venue, "year": int(record["year"]), "title": title,
-                     "authors": record.get("authors"), "page": page, "pdf": pdf, "tier": tier}
+                     "authors": record.get("authors"), "page": page, "pdf": pdf, "tier": tier,
+                     "decision": label}
+            identity = paper_key(paper)
+            if not accepted_decision(venue, archive_year, label, decision):
+                excluded.add(identity)
+                continue
+            accepted.add(identity)
+            archive = f"{archive_venue}_{archive_year}_{decision}.tar.gz"
             groups[archive][(forum, filename)] = (paper, record.get("figure_caption") or "")
-    return groups
+    return groups, excluded - accepted
+
+
+def candidates(metadata):
+    return release_figures(metadata)[0]
 
 
 def read_archive(archive, file, targets, on_result):
@@ -225,10 +251,13 @@ def import_release(args, catalog):
         if args.local_only and not metadata.is_file():
             raise FileNotFoundError("Use --metadata or cache the DiagramBank index before --local-only")
         download_metadata(base + "/data.jsonl?download=true", metadata)
+    groups, excluded = release_figures(metadata)
+    if not args.plan:
+        catalog.exclude_unaccepted_diagram_bank(excluded)
     existing = catalog.existing()
     release = set()
     todo = defaultdict(dict)
-    for archive, records in sorted(candidates(metadata).items()):
+    for archive, records in sorted(groups.items()):
         for key, record in records.items():
             identity = paper_key(record[0])
             if identity not in release and identity not in existing:
