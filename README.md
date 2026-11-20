@@ -216,6 +216,8 @@ python -m http.server 8000
 
 或直接双击 `index.html`（数据内联在 `assets/figures.js`，无需联网）。
 
+本地扩展可导入 DiagramBank，并按录用名单优先从 arXiv HTML 补图。见 [本地扩展画廊](docs/LOCAL_GALLERY.md)。
+
 ## 🗃️ 仓库结构
 
 ```

@@ -1,7 +1,7 @@
 /* ===== Gallery static UI dictionary ===== */
 GAL_I18N.register({
   en: {
-    "tagline": 'Inspiration gallery of top-conference Figure 1 · <span class="vn iclr">ICLR</span>·<span class="vn icml">ICML</span>·<span class="vn neurips">NeurIPS</span>·<span class="vn cvpr">CVPR</span>·<span class="vn acl">ACL</span>·<span class="vn aaai">AAAI</span> · 2023–2026',
+    "tagline": 'Inspiration gallery of top-conference Figure 1 · <span class="vn iclr">ICLR</span>·<span class="vn icml">ICML</span>·<span class="vn neurips">NeurIPS</span>·<span class="vn cvpr">CVPR</span>·<span class="vn acl">ACL</span>·<span class="vn aaai">AAAI</span> · <span class="gallery-years">2023–2026</span>',
     "stat.figures": "figures",
     "intro": 'Curated <b>Figure&nbsp;1 / teaser figures</b> from six top ML conferences — <b>conceptual diagrams</b>, <b>system frameworks</b>, <b>pipelines</b> &amp; <b>architectures</b>. Filter by venue, year, <b class="t-k">acceptance tier</b> or visual pattern to find layout ideas for <b>your own paper\u2019s overview figure</b>. FigureForge can generate paper figures using images found in the gallery, your own uploads, or both. Download the results to support manuscript submission, or recreate figures with high fidelity and export editable PowerPoint (PPTX), SVG, Visio (VSDX), and draw.io files for detailed editing.',
     "cta.sub": "FigureForge can generate paper figures using images found in the gallery, your own uploads, or both. Download the results to support manuscript submission, or recreate figures with high fidelity and export editable PowerPoint (PPTX), SVG, Visio (VSDX), and draw.io files for detailed editing.",
@@ -19,7 +19,7 @@ GAL_I18N.register({
     "empty.text": "No figures match. Try other keywords or clear the filters.",
     "empty.reset": "Reset filters",
     "footer.about.h": "About this gallery",
-    "footer.about": 'Every image is the <b>Figure 1 / Teaser</b> rendered from the officially published PDF (~180–216 DPI), sourced from <a href="https://openreview.net/group?id=ICLR.cc" target="_blank" rel="noopener">OpenReview (ICLR)</a>, <a href="https://proceedings.mlr.press/" target="_blank" rel="noopener">PMLR (ICML)</a>, <a href="https://proceedings.neurips.cc/" target="_blank" rel="noopener">NeurIPS Proceedings</a>, <a href="https://openaccess.thecvf.com/" target="_blank" rel="noopener">CVF Open Access (CVPR)</a>, <a href="https://aclanthology.org/" target="_blank" rel="noopener">ACL Anthology</a>, <a href="https://ojs.aaai.org/index.php/AAAI" target="_blank" rel="noopener">AAAI Press</a> and arXiv. Each card links to the paper and lists the title and authors; copyright belongs to the authors and publishers. Most ICLR / ICML (PMLR) / NeurIPS / CVPR / ACL papers are released under <b>CC BY 4.0</b>; this gallery is for non-commercial study and research. Right-holders may write to <a href="mailto:939123836@qq.com">939123836@qq.com</a> or open a GitHub issue; content is removed within 72 hours of verification.',
+    "footer.about": 'The gallery shows each paper’s <b>Figure 1 / Teaser</b>, sourced from <a href="https://openreview.net/group?id=ICLR.cc" target="_blank" rel="noopener">OpenReview (ICLR)</a>, <a href="https://proceedings.mlr.press/" target="_blank" rel="noopener">PMLR (ICML)</a>, <a href="https://proceedings.neurips.cc/" target="_blank" rel="noopener">NeurIPS Proceedings</a>, <a href="https://openaccess.thecvf.com/" target="_blank" rel="noopener">CVF Open Access (CVPR)</a>, <a href="https://aclanthology.org/" target="_blank" rel="noopener">ACL Anthology</a>, <a href="https://ojs.aaai.org/index.php/AAAI" target="_blank" rel="noopener">AAAI Press</a>, arXiv HTML or PDFs, and <a href="https://huggingface.co/datasets/ghzlmc/DiagramBank" target="_blank" rel="noopener">DiagramBank</a>. Each card links to the paper and lists the title and authors; copyright belongs to the authors and publishers. Most ICLR / ICML (PMLR) / NeurIPS / CVPR / ACL papers are released under <b>CC BY 4.0</b>; this gallery is for non-commercial study and research. Right-holders may write to <a href="mailto:939123836@qq.com">939123836@qq.com</a> or open a GitHub issue; content is removed within 72 hours of verification.',
     "footer.pattern.h": "Visual patterns",
     "legend.teaser": "<b>teaser</b> — designed key visual with mixed text and graphics",
     "legend.conceptual": "<b>conceptual</b> — core-idea diagram, often a cartoon metaphor",
@@ -36,7 +36,7 @@ GAL_I18N.register({
     "aria.next": "Next figure",
   },
   zh: {
-    "tagline": '顶会论文主图灵感画廊 · <span class="vn iclr">ICLR</span>·<span class="vn icml">ICML</span>·<span class="vn neurips">NeurIPS</span>·<span class="vn cvpr">CVPR</span>·<span class="vn acl">ACL</span>·<span class="vn aaai">AAAI</span> · 2023–2026',
+    "tagline": '顶会论文主图灵感画廊 · <span class="vn iclr">ICLR</span>·<span class="vn icml">ICML</span>·<span class="vn neurips">NeurIPS</span>·<span class="vn cvpr">CVPR</span>·<span class="vn acl">ACL</span>·<span class="vn aaai">AAAI</span> · <span class="gallery-years">2023–2026</span>',
     "stat.figures": "张",
     "intro": '精选六大顶会排版精良的 <b>Figure 1 / Teaser</b>，覆盖<b>概念示意 · 系统框架 · 流程 · 架构</b>，并按 <b style="color:#b8860b">Oral / Spotlight / Best Paper</b> 等级标注，为你的论文主图找灵感。 FigureForge 可用画廊检索图、自己上传的图，或混合两者生成论文主图。成图可直接下载辅助论文投稿，也可高保真复刻并导出为可编辑的 PPTX（PowerPoint）、SVG、VSDX（Visio）和 draw.io 文件，逐项精修。',
     "cta.sub": "FigureForge 可用六大顶会画廊检索到的参考图、自己上传的图，或混合两者生成论文主图。成图可直接下载辅助论文投稿，也可高保真复刻并导出为可编辑的 PPTX（PowerPoint）、SVG、VSDX（Visio）和 draw.io 文件，逐项精修。",
@@ -54,7 +54,7 @@ GAL_I18N.register({
     "empty.text": "没有符合条件的图，试试换个关键词或清除筛选。",
     "empty.reset": "重置筛选",
     "footer.about.h": "关于本画廊",
-    "footer.about": '所有图片均提取自正式发表论文的 <b>Figure 1 / Teaser</b>（PDF 渲染，约 180–216 DPI），来源为 OpenReview（ICLR）、PMLR（ICML）、NeurIPS Proceedings、CVF Open Access（CVPR）、ACL Anthology、AAAI Press 与 arXiv。每张卡片均标注论文标题、全部作者与原文链接，版权归原作者及出版方所有。ICLR / ICML(PMLR) / NeurIPS / CVPR / ACL 正式出版论文多以 <b>CC BY 4.0</b> 许可发布；本画廊仅用于非商业学习、研究与配图灵感参考。若您是版权方并认为收录不当，请联系 <a href="mailto:939123836@qq.com">939123836@qq.com</a> 或提 GitHub Issue，核实后 72 小时内删除。',
+    "footer.about": '画廊展示论文的 <b>Figure 1 / Teaser</b>，来源包括 OpenReview（ICLR）、PMLR（ICML）、NeurIPS Proceedings、CVF Open Access（CVPR）、ACL Anthology、AAAI Press、arXiv HTML 或 PDF，以及 <a href="https://huggingface.co/datasets/ghzlmc/DiagramBank" target="_blank" rel="noopener">DiagramBank</a>。每张卡片均标注论文标题、全部作者与原文链接，版权归原作者及出版方所有。ICLR / ICML(PMLR) / NeurIPS / CVPR / ACL 正式出版论文多以 <b>CC BY 4.0</b> 许可发布；本画廊仅用于非商业学习、研究与配图灵感参考。若您是版权方并认为收录不当，请联系 <a href="mailto:939123836@qq.com">939123836@qq.com</a> 或提 GitHub Issue，核实后 72 小时内删除。',
     "footer.pattern.h": "视觉模式说明",
     "legend.teaser": "<b>teaser</b> 经过版式设计的主视觉 / 图文混排",
     "legend.conceptual": "<b>conceptual</b> 核心概念示意（卡通隐喻）",

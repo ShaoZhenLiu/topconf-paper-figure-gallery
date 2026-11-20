@@ -9,6 +9,7 @@
     cvpr:    { name: "CVPR", cn: "CVPR" },
     acl:     { name: "ACL", cn: "ACL" },
     aaai:    { name: "AAAI", cn: "AAAI" },
+    tmlr:    { name: "TMLR", cn: "TMLR" },
   };
   const PATTERNS = {
     teaser:       "Teaser",
@@ -19,15 +20,16 @@
     taxonomy:     "Taxonomy / Benchmark",
     results:      "Results",
     comparison:   "Comparison",
+    untagged:     "Unclassified",
   };
-  const PATTERN_ORDER = ["teaser", "conceptual", "framework", "pipeline", "architecture", "taxonomy", "results", "comparison"];
+  const PATTERN_ORDER = ["teaser", "conceptual", "framework", "pipeline", "architecture", "taxonomy", "results", "comparison", "untagged"];
   const TIERS = { best: "Best Paper", oral: "Oral", spotlight: "Spotlight" };
   const PAGE = 60;
 
   /* ---------- i18n: dynamic labels ---------- */
   GAL_I18N.register({
     en: {
-      "chip.all": "All",
+      "chip.all": "All", "filter.curated": "Curated only", "pat.untagged": "Unclassified",
       "pat.teaser": "Teaser", "pat.conceptual": "Conceptual", "pat.framework": "Framework",
       "pat.pipeline": "Pipeline", "pat.architecture": "Architecture",
       "pat.taxonomy": "Taxonomy / Benchmark", "pat.results": "Results", "pat.comparison": "Comparison",
@@ -41,7 +43,7 @@
       "count.base": "<b>{n}</b> / {m} figures",
     },
     zh: {
-      "chip.all": "全部",
+      "chip.all": "全部", "filter.curated": "仅精选", "pat.untagged": "待分类",
       "pat.teaser": "主视觉", "pat.conceptual": "概念图", "pat.framework": "框架总览",
       "pat.pipeline": "流程图", "pat.architecture": "架构图",
       "pat.taxonomy": "全景 / 基准", "pat.results": "结果", "pat.comparison": "对比",
@@ -58,8 +60,12 @@
   const patLabel = (p) => GAL_I18N.t("pat." + p);
   const tierLabel = (v) => GAL_I18N.t("tier." + v);
 
-  const state = { venue: "all", year: "all", tier: "all", pattern: "all", q: "", sort: "venue" };
-  const figures = (window.FIGURES || []).slice();
+  const state = { venue: "all", year: "all", tier: "all", pattern: "all", q: "", sort: "venue", curatedOnly: true };
+  const curatedFigures = (window.FIGURES || []).slice();
+  let figures = curatedFigures;
+  let additions;
+  let years = [];
+  let venues = [];
   let filtered = [];
   let shown = 0;
 
@@ -69,13 +75,32 @@
   const sentinel = $("#sentinel");
   const endHint = $("#end-hint");
   const countEl = $("#result-count");
-  $("#total-figures").textContent = figures.length.toLocaleString();
-  const nBest = figures.filter((f) => f.award).length;
-  const nOral = figures.filter((f) => (f.award ? false : f.tier === "oral")).length;
-  const nSpot = figures.filter((f) => (!f.award && f.tier === "spotlight")).length;
-  $("#total-best").textContent = nBest.toLocaleString();
-  $("#total-oral").textContent = nOral.toLocaleString();
-  $("#total-spotlight").textContent = nSpot.toLocaleString();
+  const curatedButton = $("#curated-only");
+
+  function loadAdditions() {
+    if (!additions) {
+      additions = new Promise((resolve) => {
+        const script = document.createElement("script");
+        script.src = "gallery-local/figures.js";
+        script.onload = () => resolve(curatedFigures.concat(window.GALLERY_ADDITIONS || []));
+        script.onerror = () => {
+          additions = undefined;
+          script.remove();
+          resolve(curatedFigures);
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return additions;
+  }
+
+  async function selectCoverage(curatedOnly) {
+    state.curatedOnly = curatedOnly;
+    const scoped = curatedOnly ? curatedFigures : await loadAdditions();
+    if (state.curatedOnly !== curatedOnly || scoped === figures) return;
+    figures = scoped;
+    buildFilterChips();
+  }
 
   /* ---------- filter chips ---------- */
   const chipBoxes = [];
@@ -88,6 +113,7 @@
   }
   function makeChips(containerId, key, values, labelKeyFor, counts) {
     const box = $(containerId);
+    box.replaceChildren();
     const all = document.createElement("button");
     all.className = "chip active";
     all.dataset.lk = "chip.all";
@@ -104,33 +130,59 @@
       box.appendChild(c);
     });
     chipBoxes.push({ box, counts });
-    box.addEventListener("click", (e) => {
+    box.onclick = (e) => {
       const btn = e.target.closest(".chip");
       if (!btn) return;
       state[key] = btn.dataset.val;
       box.querySelectorAll(".chip").forEach((x) => x.classList.toggle("active", x === btn));
       render();
-    });
+    };
   }
 
-  const years = [...new Set(figures.map((f) => f.year))].sort();
-  const usedPatterns = PATTERN_ORDER.filter((p) => figures.some((f) => f.pattern === p));
-
-  makeChips("#venue-chips", "venue", Object.keys(VENUES), (v) => "static:" + VENUES[v].name,
-    Object.fromEntries(Object.keys(VENUES).map((v) => [v, figures.filter((f) => f.venue === v).length])));
-  makeChips("#year-chips", "year", years, () => null);
-  makeChips("#tier-chips", "tier", ["best", "oral", "spotlight"], (v) => "tier." + v,
-    { best: nBest, oral: nOral, spotlight: nSpot });
-  makeChips("#pattern-chips", "pattern", usedPatterns, (v) => "pat." + v);
+  function buildFilterChips() {
+    chipBoxes.length = 0;
+    years = [...new Set(figures.map((f) => f.year))].sort();
+    const byVenue = {};
+    const byTier = { best: 0, oral: 0, spotlight: 0 };
+    const patterns = new Set();
+    figures.forEach((figure) => {
+      byVenue[figure.venue] = (byVenue[figure.venue] || 0) + 1;
+      if (figure.award) byTier.best++;
+      else if (figure.tier in byTier) byTier[figure.tier]++;
+      patterns.add(figure.pattern);
+    });
+    venues = Object.keys(VENUES).filter((venue) => byVenue[venue]);
+    const usedPatterns = PATTERN_ORDER.filter((pattern) => patterns.has(pattern));
+    if (!venues.includes(state.venue)) state.venue = "all";
+    if (!years.some((year) => String(year) === state.year)) state.year = "all";
+    if (!usedPatterns.includes(state.pattern)) state.pattern = "all";
+    makeChips("#venue-chips", "venue", venues, (v) => "static:" + VENUES[v].name, byVenue);
+    makeChips("#year-chips", "year", years, () => null);
+    makeChips("#tier-chips", "tier", Object.keys(TIERS), (v) => "tier." + v, byTier);
+    makeChips("#pattern-chips", "pattern", usedPatterns, (v) => "pat." + v);
+    $("#total-figures").textContent = figures.length.toLocaleString();
+    $("#total-best").textContent = byTier.best.toLocaleString();
+    $("#total-oral").textContent = byTier.oral.toLocaleString();
+    $("#total-spotlight").textContent = byTier.spotlight.toLocaleString();
+    relabelChips();
+  }
 
   function relabelChips() {
     chipBoxes.forEach(({ box, counts }) => {
       box.querySelectorAll(".chip").forEach((btn) => { btn.innerHTML = chipText(btn, counts); });
     });
   }
-  // Chips are built empty above; without this first pass they stay blank until
-  // the visitor happens to switch language (langchange calls relabelChips).
-  relabelChips();
+  buildFilterChips();
+  curatedButton.addEventListener("click", async () => {
+    curatedButton.disabled = true;
+    try {
+      await selectCoverage(!state.curatedOnly);
+      syncUiFromState();
+      render();
+    } finally {
+      curatedButton.disabled = false;
+    }
+  });
 
   /* ---------- search ---------- */
   const searchInput = $("#search");
@@ -148,12 +200,10 @@
     searchInput.value = ""; state.q = ""; clearBtn.hidden = true; render();
   });
   $("#sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
-  $("#reset-all").addEventListener("click", () => {
+  $("#reset-all").addEventListener("click", async () => {
     state.venue = state.year = state.tier = state.pattern = "all"; state.q = "";
-    searchInput.value = ""; clearBtn.hidden = true;
-    document.querySelectorAll(".chips").forEach((b) => {
-      b.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c.dataset.val === "all"));
-    });
+    await selectCoverage(true);
+    syncUiFromState();
     render();
   });
 
@@ -177,7 +227,7 @@
   }
 
   function sorted(list) {
-    const venueRank = { iclr: 0, icml: 1, neurips: 2, cvpr: 3, acl: 4, aaai: 5 };
+    const venueRank = Object.fromEntries(Object.keys(VENUES).map((venue, rank) => [venue, rank]));
     const l = list.slice();
     if (state.sort === "year") l.sort((a, b) => a.year - b.year || venueRank[a.venue] - venueRank[b.venue] || a.id.localeCompare(b.id));
     else if (state.sort === "title") l.sort((a, b) => a.title.localeCompare(b.title));
@@ -331,11 +381,11 @@
      Filters and the search box live in ?v=&y=&t=&p=&q=&s=, the open figure lives in
      #f=<id>. Hash-only writes never reload GitHub Pages, so switching figures or
      clearing the hash costs nothing. */
-  const URL_KEYS = ["v", "y", "t", "p", "q", "s"];
+  const URL_KEYS = ["v", "y", "t", "p", "q", "s", "c"];
   let internalUrlWrite = false;
 
   function validFilter(key, value) {
-    if (key === "v") return value === "all" || Object.prototype.hasOwnProperty.call(VENUES, value);
+    if (key === "v") return value === "all" || venues.includes(value);
     if (key === "y") return value === "all" || years.some((x) => String(x) === value);
     if (key === "t") return value === "all" || Object.prototype.hasOwnProperty.call(TIERS, value);
     if (key === "p") return value === "all" || Object.prototype.hasOwnProperty.call(PATTERNS, value);
@@ -355,6 +405,7 @@
     if (state.pattern !== "all") params.set("p", state.pattern);
     if (state.q) params.set("q", state.q);
     if (state.sort !== "venue") params.set("s", state.sort);
+    if (!state.curatedOnly) params.set("c", "all");
     return params.toString();
   }
 
@@ -726,6 +777,12 @@
 
   /* ---------- URL -> UI ---------- */
   function syncUiFromState() {
+    curatedButton.classList.toggle("active", state.curatedOnly);
+    curatedButton.setAttribute("aria-pressed", String(state.curatedOnly));
+    const yearLabel = $(".gallery-years");
+    if (yearLabel && years.length) {
+      yearLabel.textContent = years.length > 1 ? years[0] + "–" + years[years.length - 1] : years[0];
+    }
     const keyByBox = { "venue-chips": "venue", "year-chips": "year", "tier-chips": "tier", "pattern-chips": "pattern" };
     document.querySelectorAll(".chips").forEach((box) => {
       const key = keyByBox[box.id];
@@ -739,8 +796,9 @@
     $("#sort").value = state.sort;
   }
 
-  function readUrlState() {
+  async function readUrlState() {
     const params = new URLSearchParams(location.search);
+    await selectCoverage(params.get("c") !== "all");
     ["v", "y", "t", "p", "s", "q"].forEach((key) => {
       if (!params.has(key)) return;
       const value = params.get(key);
@@ -789,7 +847,7 @@
 
   async function runUrlChange() {
     const before = JSON.stringify(state);
-    readUrlState();
+    await readUrlState();
     if (JSON.stringify(state) !== before) {
       syncUiFromState();
       render();
@@ -865,6 +923,7 @@
   document.addEventListener("langchange", () => {
     syncToggle();
     relabelChips();
+    syncUiFromState();
     if (!lb.hidden && currentId) {
       const f = figures.find((x) => x.id === currentId);
       if (f) setFigureContent(f);
@@ -876,12 +935,10 @@
   GAL_I18N.apply();
   // Filters from the URL must be in state before the first render, otherwise the
   // grid paints the unfiltered list for one frame.
-  readUrlState();
-  syncUiFromState();
-  render();
-  // Cold start: `#f=<id>` from a shared link opens that figure, which also warms
-  // the 60-card chunk it lives in whenever the filters still include it.
-  // `window.__tcLastError` records a failed cold start for debugging; it is never
-  // user-visible and never blocks the grid.
-  applyHashToLightbox().catch((err) => { window.__tcLastError = String((err && err.stack) || err); });
+  readUrlState().then(() => {
+    syncUiFromState();
+    render();
+    return applyHashToLightbox();
+  }).catch((err) => { window.__tcLastError = String((err && err.stack) || err); });
+
 })();

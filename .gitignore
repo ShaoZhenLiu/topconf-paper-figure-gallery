@@ -76,3 +76,8 @@ data/matched.json
 scripts/gh_push.py
 scripts/gh_runs.py
 scripts/verify_tree.py
+
+# Local gallery imports and download cache
+/gallery-local/
+/.gallery-cache/
+/.venv/
