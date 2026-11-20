@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://shaozhenliu.github.io/topconf-paper-figure-gallery/sitemap.xml
