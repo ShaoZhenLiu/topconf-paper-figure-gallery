@@ -58,14 +58,14 @@ def atomic_write(path, contents):
         temporary = Path(out.name)
         out.write(contents)
     try:
-        for attempt in range(5):
+        delays = (0.04, 0.12, 0.28, 0.55, 0.95, 1.5, 2.2)
+        for delay in delays:
             try:
                 os.replace(temporary, path)
-                break
+                return
             except PermissionError:
-                if attempt == 4:
-                    raise
-                time.sleep(0.04 * (attempt + 1))
+                time.sleep(delay)
+        os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -146,6 +146,12 @@ class Catalog:
     def save(self, result):
         key, row = result
         with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            current = self.db.execute("SELECT record FROM figures WHERE paper_key=?", (key,)).fetchone()
+            if current:
+                saved = json.loads(current[0])
+                if saved.get("pattern_source") == "visual-review" and saved["image"] == row["image"]:
+                    row = {**row, "pattern": saved["pattern"], "pattern_source": "visual-review"}
             self.db.execute("""
                 INSERT INTO figures VALUES (?, ?, ?)
                 ON CONFLICT(paper_key) DO UPDATE SET
@@ -158,7 +164,7 @@ class Catalog:
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO attempts VALUES (?, ?, ?)", (key, status, detail))
 
-    def publish(self):
+    def publish(self, *, strict=False):
         # Serialize publication with catalog writers so a concurrent export cannot
         # replace a more recent snapshot with stale metadata.
         with self.db:
@@ -170,7 +176,14 @@ class Catalog:
             rows = [row for row in rows if (ROOT / row["image"]).is_file()]
             rows.sort(key=lambda row: (row["venue"], row["year"], row["id"]))
             bundle = "window.GALLERY_ADDITIONS = " + json.dumps(rows, ensure_ascii=True) + ";\n"
-            atomic_write(LOCAL / "figures.js", bundle.encode("utf-8"))
+            try:
+                atomic_write(LOCAL / "figures.js", bundle.encode("utf-8"))
+            except PermissionError:
+                if strict:
+                    raise
+                # A Windows reader can briefly hold figures.js open. Keep
+                # importing and retry the atomic export at the next checkpoint.
+                print("Gallery index is in use. Figures are saved in the catalog.", flush=True)
         return rows
 
     def status(self):

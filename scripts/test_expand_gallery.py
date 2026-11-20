@@ -1,15 +1,17 @@
 """Regression checks for the local gallery's acquisition paths."""
 import io
+import json
 import tarfile
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
 import pymupdf
 from PIL import Image
 
-from gallery_extension import arxiv, conferences, diagrambank, rosters
+from gallery_extension import arxiv, catalog, conferences, diagrambank, rosters
 
 
 def png():
@@ -103,6 +105,35 @@ class DiagramBankTest(unittest.TestCase):
                 with patch.object(diagrambank.subprocess, "run", side_effect=transfer):
                     self.assertEqual(stream.read(5), b"abcde")
                     self.assertEqual(stream.available, 5)
+
+
+class CatalogTest(unittest.TestCase):
+    def test_export_retries_when_windows_reader_holds_the_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "figures.js"
+            path.write_bytes(b"old")
+            replace = catalog.os.replace
+
+            def unlock_after_first_attempt(source, destination):
+                if snapshot_replace.call_count == 1:
+                    raise PermissionError("snapshot in use")
+                replace(source, destination)
+
+            with patch.object(catalog.os, "replace", side_effect=unlock_after_first_attempt) as snapshot_replace:
+                catalog.atomic_write(path, b"new")
+            self.assertEqual(path.read_bytes(), b"new")
+            self.assertEqual(snapshot_replace.call_count, 2)
+
+    def test_reimport_keeps_reviewed_label_for_same_image(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(catalog, "LOCAL", Path(directory)):
+            gallery = catalog.Catalog()
+            with closing(gallery.db):
+                row = {"source": "diagram-bank", "image": "figure.jpg", "pattern": "framework"}
+                gallery.save(("paper", {**row, "pattern_source": "visual-review"}))
+                gallery.save(("paper", {**row, "pattern": "untagged"}))
+                record, = gallery.db.execute("SELECT record FROM figures").fetchone()
+            self.assertEqual(json.loads(record)["pattern"], "framework")
+            self.assertEqual(json.loads(record)["pattern_source"], "visual-review")
 
 
 class RosterTest(unittest.TestCase):
